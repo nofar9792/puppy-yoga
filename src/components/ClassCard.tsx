@@ -1,3 +1,4 @@
+import StarRating from './StarRating.tsx'
 import type { YogaClass } from '../types.ts'
 
 interface ClassCardProps {
@@ -15,7 +16,7 @@ function levelClass(level: YogaClass['level']): string {
 }
 
 export default function ClassCard({ classItem, isBooked, onWaitlist, onBook, onJoinWaitlist }: ClassCardProps) {
-  const { title, instructor, date, time, duration, spots, totalSpots, level, dogs, price, emoji } = classItem
+  const { title, instructor, date, time, duration, spots, totalSpots, level, dogs, price, emoji, avgRating, reviewCount } = classItem
   const isFull = spots === 0
   const spotsPercent = Math.round((spots / totalSpots) * 100)
   const fillColor = spots <= 2 ? '#e74c3c' : spots <= 5 ? '#f39c12' : '#27ae60'
@@ -42,6 +43,13 @@ export default function ClassCard({ classItem, isBooked, onWaitlist, onBook, onJ
         <div className="card-title">{title}</div>
         <div className="card-instructor">{instructor}</div>
 
+        {avgRating !== null && reviewCount > 0 && (
+          <div className="card-rating">
+            <StarRating value={Math.round(avgRating)} size="sm" />
+            <span className="rating-text">{avgRating.toFixed(1)} ({reviewCount})</span>
+          </div>
+        )}
+
         <div className="card-details">
           <div className="card-detail">
             <span className="card-detail-icon">📅</span>
@@ -54,25 +62,18 @@ export default function ClassCard({ classItem, isBooked, onWaitlist, onBook, onJ
         </div>
 
         <div className="card-dogs">
-          {dogs.map(dog => (
-            <span key={dog} className="dog-tag">{dog}</span>
-          ))}
+          {dogs.map(dog => <span key={dog} className="dog-tag">{dog}</span>)}
         </div>
 
         <div className="spots-bar">
           {isFull ? 'Class full' : `${spots} of ${totalSpots} spots left`}
           <div className="spots-track">
-            <div
-              className="spots-fill"
-              style={{ width: `${spotsPercent}%`, background: fillColor }}
-            />
+            <div className="spots-fill" style={{ width: `${spotsPercent}%`, background: fillColor }} />
           </div>
         </div>
 
         <div className="card-footer">
-          <div className="card-price">
-            ${price}<span>/person</span>
-          </div>
+          <div className="card-price">${price}<span>/person</span></div>
           {renderAction()}
         </div>
       </div>

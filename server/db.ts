@@ -22,9 +22,19 @@ db.exec(`
     emoji       TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,
+    email         TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    is_admin      INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS bookings (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     class_id  INTEGER NOT NULL REFERENCES classes(id),
+    user_id   INTEGER REFERENCES users(id),
     name      TEXT NOT NULL,
     email     TEXT NOT NULL,
     phone     TEXT NOT NULL DEFAULT '',
@@ -34,10 +44,30 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS waitlist (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
     class_id INTEGER NOT NULL REFERENCES classes(id),
+    user_id  INTEGER REFERENCES users(id),
     email    TEXT NOT NULL,
     UNIQUE(class_id, email)
   );
+
+  CREATE TABLE IF NOT EXISTS reviews (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    class_id   INTEGER NOT NULL REFERENCES classes(id),
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    rating     INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+    comment    TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    UNIQUE(class_id, user_id)
+  );
 `)
+
+// Migrate existing bookings table if user_id column is missing
+try {
+  db.exec('ALTER TABLE bookings ADD COLUMN user_id INTEGER REFERENCES users(id)')
+} catch { /* column already exists */ }
+
+try {
+  db.exec('ALTER TABLE waitlist ADD COLUMN user_id INTEGER REFERENCES users(id)')
+} catch { /* column already exists */ }
 
 const { n } = db.prepare('SELECT COUNT(*) as n FROM classes').get() as { n: number }
 
@@ -47,12 +77,12 @@ if (n === 0) {
   )
 
   const seed = [
-    [1, 'Morning Paws Flow',          'Sarah & the Golden Trio',    '2026-06-07', '9:00 AM',  '60 min', 10, 'All Levels',   JSON.stringify(['Golden Retriever', 'Labrador', 'Beagle']),                   35, '🐕'],
-    [2, 'Sunset Stretch & Snuggles',  'Mike & the Doodle Gang',     '2026-06-08', '5:30 PM',  '75 min', 10, 'Beginner',     JSON.stringify(['Goldendoodle', 'Labradoodle']),                               40, '🐩'],
-    [3, 'Power Yoga & Puppies',        'Emma & the Terrier Crew',    '2026-06-10', '7:00 AM',  '60 min',  8, 'Intermediate', JSON.stringify(['Yorkshire Terrier', 'Jack Russell', 'Westie']),              38, '🐶'],
-    [4, 'Gentle Flow & Fluffballs',    'Lily & the Pomeranian Pack', '2026-06-12', '11:00 AM', '60 min', 10, 'Beginner',     JSON.stringify(['Pomeranian', 'Shih Tzu', 'Maltese']),                        35, '🦮'],
-    [5, 'Weekend Wag & Warrior',       'Tom & the Big Dog Club',     '2026-06-14', '10:00 AM', '90 min', 12, 'All Levels',   JSON.stringify(['Husky', 'German Shepherd', 'Bernese Mountain Dog']),         45, '🐾'],
-    [6, 'Mindful Mutts Meditation',    'Zoe & the Rescue Pups',      '2026-06-15', '4:00 PM',  '60 min',  8, 'All Levels',   JSON.stringify(['Mixed Breeds']),                                             30, '🧘'],
+    [1, 'Morning Paws Flow',         'Sarah & the Golden Trio',    '2026-06-07', '9:00 AM',  '60 min', 10, 'All Levels',   JSON.stringify(['Golden Retriever', 'Labrador', 'Beagle']),              35, '🐕'],
+    [2, 'Sunset Stretch & Snuggles', 'Mike & the Doodle Gang',     '2026-06-08', '5:30 PM',  '75 min', 10, 'Beginner',     JSON.stringify(['Goldendoodle', 'Labradoodle']),                          40, '🐩'],
+    [3, 'Power Yoga & Puppies',      'Emma & the Terrier Crew',    '2026-06-10', '7:00 AM',  '60 min',  8, 'Intermediate', JSON.stringify(['Yorkshire Terrier', 'Jack Russell', 'Westie']),         38, '🐶'],
+    [4, 'Gentle Flow & Fluffballs',  'Lily & the Pomeranian Pack', '2026-06-12', '11:00 AM', '60 min', 10, 'Beginner',     JSON.stringify(['Pomeranian', 'Shih Tzu', 'Maltese']),                   35, '🦮'],
+    [5, 'Weekend Wag & Warrior',     'Tom & the Big Dog Club',     '2026-06-14', '10:00 AM', '90 min', 12, 'All Levels',   JSON.stringify(['Husky', 'German Shepherd', 'Bernese Mountain Dog']),    45, '🐾'],
+    [6, 'Mindful Mutts Meditation',  'Zoe & the Rescue Pups',      '2026-06-15', '4:00 PM',  '60 min',  8, 'All Levels',   JSON.stringify(['Mixed Breeds']),                                        30, '🧘'],
   ] as const
 
   for (const row of seed) stmt.run(...row)

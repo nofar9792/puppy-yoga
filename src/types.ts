@@ -11,6 +11,8 @@ export interface YogaClass {
   dogs: string[]
   price: number
   emoji: string
+  avgRating: number | null
+  reviewCount: number
 }
 
 export interface BookingFormData {
@@ -27,4 +29,21 @@ export interface Booking extends BookingFormData {
 export interface WaitlistEntry {
   classId: number
   email: string
+}
+
+export interface AuthUser {
+  userId: number
+  name: string
+  email: string
+  isAdmin: boolean
+}
+
+export interface Review {
+  id: number
+  classId: number
+  userId: number
+  userName: string
+  rating: number
+  comment: string
+  createdAt: string
 }
