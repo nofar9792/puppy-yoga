@@ -51,6 +51,51 @@ export default function Header({ bookingCount, view, onViewChange }: HeaderProps
         </div>
       </header>
 
+      <nav className="bottom-nav">
+        <button
+          className={`bottom-nav-btn ${view === 'classes' ? 'active' : ''}`}
+          onClick={() => onViewChange('classes')}
+        >
+          <span className="bottom-nav-icon">🏠</span>
+          <span className="bottom-nav-label">Classes</span>
+        </button>
+
+        {user && (
+          <button
+            className={`bottom-nav-btn ${view === 'my-bookings' ? 'active' : ''}`}
+            onClick={() => onViewChange('my-bookings')}
+          >
+            <span className="bottom-nav-icon-wrap">
+              <span className="bottom-nav-icon">📅</span>
+              {bookingCount > 0 && <span className="bottom-nav-badge">{bookingCount}</span>}
+            </span>
+            <span className="bottom-nav-label">My Bookings</span>
+          </button>
+        )}
+
+        {user?.isAdmin && (
+          <button
+            className={`bottom-nav-btn ${view === 'admin' ? 'active' : ''}`}
+            onClick={() => onViewChange('admin')}
+          >
+            <span className="bottom-nav-icon">⚙️</span>
+            <span className="bottom-nav-label">Admin</span>
+          </button>
+        )}
+
+        {user ? (
+          <button className="bottom-nav-btn" onClick={logout}>
+            <span className="bottom-nav-icon">👤</span>
+            <span className="bottom-nav-label">Log out</span>
+          </button>
+        ) : (
+          <button className="bottom-nav-btn" onClick={() => setShowAuth(true)}>
+            <span className="bottom-nav-icon">👤</span>
+            <span className="bottom-nav-label">Log in</span>
+          </button>
+        )}
+      </nav>
+
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </>
   )

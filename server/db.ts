@@ -5,7 +5,8 @@ import fs from 'fs'
 const dataDir = path.join(process.cwd(), 'data')
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir)
 
-const db = new Database(path.join(dataDir, 'puppy-yoga.db'))
+const dbFile = process.env.DB_PATH ?? path.join(dataDir, 'puppy-yoga.db')
+const db = new Database(dbFile)
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS classes (

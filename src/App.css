@@ -4,6 +4,11 @@
   padding: 0;
 }
 
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   font-family: 'Segoe UI', system-ui, sans-serif;
   background: #fdf6f0;
@@ -1025,17 +1030,159 @@ body {
 
 .form-group select:focus { border-color: #c2693a; }
 
+/* ── Bottom navigation bar (hidden on desktop, shown on mobile) ── */
+
+.bottom-nav {
+  display: none;
+}
+
+.bottom-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.25rem 0.35rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #aaa;
+  gap: 0.2rem;
+  transition: color 0.15s;
+  min-height: 56px;
+}
+
+.bottom-nav-btn.active { color: #c2693a; }
+.bottom-nav-btn:active { background: #fdf0e6; }
+
+.bottom-nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bottom-nav-icon { font-size: 1.35rem; line-height: 1; }
+
+.bottom-nav-badge {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  background: #c2693a;
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  min-width: 14px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.bottom-nav-label {
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* ── Mobile styles ── */
+
 @media (max-width: 600px) {
-  .main { padding: 1rem; }
-  .hero h2 { font-size: 1.6rem; }
-  .filters { padding: 0 1rem 1.2rem; }
-  .search-bar { padding: 0 1rem 1rem; }
-  .grid { grid-template-columns: 1fr; }
-  .booking-card { flex-direction: column; }
-  .booking-footer { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
-  .header-nav { gap: 0; }
-  .nav-btn { padding: 0.4rem 0.7rem; font-size: 0.82rem; }
+  /* Bottom nav */
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1.5px solid #f0d9c8;
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+  }
+
+  /* Page needs bottom padding so content isn't hidden behind the nav */
+  .app { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+
+  /* Header — hide desktop nav, shrink height */
+  .header { padding: 0 1rem; height: 54px; }
+  .header-logo { font-size: 1.1rem; }
+  .header-nav { display: none; }
   .header-user { gap: 0.3rem; }
   .user-name { display: none; }
+  .btn-logout { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
+
+  /* Toast — float above bottom nav */
+  .toast {
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 0.75rem);
+    white-space: normal;
+    max-width: 88vw;
+    text-align: center;
+  }
+
+  /* Success banner — full-bleed */
+  .success-banner { margin: 0 0 1rem; border-radius: 0; }
+
+  /* Main / hero */
+  .main { padding: 1rem; }
+  .hero { padding: 1.5rem 1rem 1rem; }
+  .hero h2 { font-size: 1.6rem; }
+  .hero-emoji { font-size: 3rem; margin-bottom: 0.5rem; }
+  .hero p { font-size: 0.95rem; }
+
+  /* Search */
+  .search-bar { padding: 0 1rem 1rem; }
+
+  /* Filters — horizontal scroll instead of wrap */
+  .filters {
+    padding: 0 1rem 1.2rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .filters::-webkit-scrollbar { display: none; }
+  .filter-label { flex-shrink: 0; }
+  .filter-btn { flex-shrink: 0; white-space: nowrap; }
+
+  /* Grid */
+  .grid { grid-template-columns: 1fr; }
+
+  /* Cards — remove hover lift on touch devices */
+  .card:hover { transform: none; box-shadow: 0 2px 12px rgba(0,0,0,0.07); }
+
+  /* Booking cards */
+  .booking-card { flex-direction: column; gap: 0.75rem; }
+  .booking-footer { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  .booking-actions { flex-wrap: wrap; }
+
+  /* Modals — bottom sheet */
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal {
+    border-radius: 20px 20px 0 0;
+    max-width: 100%;
+    animation: slideUp 0.28s ease;
+  }
+  .modal-wide { max-width: 100%; }
+  .class-form { max-height: 52vh; }
+
+  /* Form rows */
   .form-row { flex-direction: column; }
+
+  /* Admin tabs — horizontal scroll */
+  .admin-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 1rem;
+  }
+  .admin-tabs::-webkit-scrollbar { display: none; }
+  .admin-tab { flex-shrink: 0; }
 }
