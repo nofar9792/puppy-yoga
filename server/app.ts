@@ -4,6 +4,20 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import type BetterSQLite3 from 'better-sqlite3'
 import { requireAuth, requireAdmin, JWT_SECRET } from './auth'
+import { sendBookingConfirmation } from './email'
+
+function parseClassDatetime(date: string, time: string): Date {
+  const match = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (!match) return new Date(date)
+  let hours = parseInt(match[1])
+  const minutes = parseInt(match[2])
+  const ampm = match[3].toUpperCase()
+  if (ampm === 'PM' && hours !== 12) hours += 12
+  if (ampm === 'AM' && hours === 12) hours = 0
+  const d = new Date(date + 'T00:00:00')
+  d.setHours(hours, minutes, 0, 0)
+  return d
+}
 
 interface ClassRow {
   id: number; title: string; instructor: string; date: string; time: string
@@ -123,13 +137,43 @@ export function createApp(db: BetterSQLite3.Database) {
       'INSERT INTO bookings (class_id, user_id, name, email, phone, booked_at) VALUES (?, ?, ?, ?, ?, ?)'
     ).run(classId, req.user!.userId, name, email, phone ?? '', new Date().toISOString())
 
+    const classInfo = db.prepare('SELECT * FROM classes WHERE id = ?').get(classId) as ClassRow | undefined
+    if (classInfo) {
+      sendBookingConfirmation({
+        to: email, name, classTitle: classInfo.title,
+        classDate: classInfo.date, classTime: classInfo.time, price: classInfo.price,
+      }).catch(() => {})
+    }
+
     res.status(201).json({ ok: true })
   })
 
   app.delete('/api/bookings/:classId', requireAuth, (req: Request, res: Response) => {
-    db.prepare('DELETE FROM bookings WHERE class_id = ? AND user_id = ?').run(
-      Number(req.params.classId), req.user!.userId
-    )
+    const classId = Number(req.params.classId)
+
+    const CANCEL_HOURS = Number(process.env.CANCEL_HOURS_BEFORE ?? 2)
+    const classInfo = db.prepare('SELECT date, time FROM classes WHERE id = ?').get(classId) as { date: string; time: string } | undefined
+    if (classInfo) {
+      const classAt = parseClassDatetime(classInfo.date, classInfo.time)
+      const hoursUntil = (classAt.getTime() - Date.now()) / 3_600_000
+      if (hoursUntil > 0 && hoursUntil < CANCEL_HOURS) {
+        res.status(409).json({ error: `Cancellations close ${CANCEL_HOURS}h before class start` }); return
+      }
+    }
+
+    db.prepare('DELETE FROM bookings WHERE class_id = ? AND user_id = ?').run(classId, req.user!.userId)
+
+    const next = db.prepare(
+      'SELECT w.*, u.name as uname, u.email as uemail FROM waitlist w LEFT JOIN users u ON u.id = w.user_id WHERE w.class_id = ? AND w.user_id IS NOT NULL ORDER BY w.id ASC LIMIT 1'
+    ).get(classId) as (WaitlistRow & { uname: string; uemail: string }) | undefined
+
+    if (next?.user_id) {
+      db.prepare(
+        'INSERT OR IGNORE INTO bookings (class_id, user_id, name, email, phone, booked_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).run(classId, next.user_id, next.uname, next.uemail, '', new Date().toISOString())
+      db.prepare('DELETE FROM waitlist WHERE id = ?').run(next.id)
+    }
+
     res.json({ ok: true })
   })
 
@@ -211,14 +255,24 @@ export function createApp(db: BetterSQLite3.Database) {
   })
 
   app.post('/api/admin/classes', requireAdmin, (req: Request, res: Response) => {
-    const { title, instructor, date, time, duration, totalSpots, level, dogs, price, emoji } = req.body as {
+    const { title, instructor, date, time, duration, totalSpots, level, dogs, price, emoji, recurrenceWeeks } = req.body as {
       title: string; instructor: string; date: string; time: string; duration: string
       totalSpots: number; level: string; dogs: string[]; price: number; emoji: string
+      recurrenceWeeks?: number
     }
-    const result = db.prepare(
+    const insert = db.prepare(
       'INSERT INTO classes (title, instructor, date, time, duration, total_spots, level, dogs, price, emoji) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(title, instructor, date, time, duration, totalSpots, level, JSON.stringify(dogs), price, emoji)
-    res.status(201).json({ id: result.lastInsertRowid })
+    )
+    const dogsJson = JSON.stringify(dogs)
+    const weeks = Math.min(Math.max(Number(recurrenceWeeks ?? 1), 1), 52)
+    const ids: number[] = []
+    for (let i = 0; i < weeks; i++) {
+      const d = new Date(date)
+      d.setDate(d.getDate() + i * 7)
+      const dateStr = d.toISOString().split('T')[0]
+      ids.push(insert.run(title, instructor, dateStr, time, duration, totalSpots, level, dogsJson, price, emoji).lastInsertRowid as number)
+    }
+    res.status(201).json({ id: ids[0], ids })
   })
 
   app.put('/api/admin/classes/:id', requireAdmin, (req: Request, res: Response) => {
@@ -237,6 +291,66 @@ export function createApp(db: BetterSQLite3.Database) {
     db.prepare('DELETE FROM waitlist WHERE class_id = ?').run(Number(req.params.id))
     db.prepare('DELETE FROM reviews WHERE class_id = ?').run(Number(req.params.id))
     db.prepare('DELETE FROM classes WHERE id = ?').run(Number(req.params.id))
+    res.json({ ok: true })
+  })
+
+  app.get('/api/admin/stats', requireAdmin, (_req: Request, res: Response) => {
+    const today = new Date().toISOString().split('T')[0]
+    const totalBookings = (db.prepare('SELECT COUNT(*) as n FROM bookings').get() as { n: number }).n
+    const totalRevenue = (db.prepare(
+      'SELECT COALESCE(SUM(c.price), 0) as total FROM bookings b JOIN classes c ON c.id = b.class_id'
+    ).get() as { total: number }).total
+    const totalClasses = (db.prepare('SELECT COUNT(*) as n FROM classes').get() as { n: number }).n
+    const upcomingClasses = (db.prepare('SELECT COUNT(*) as n FROM classes WHERE date >= ?').get(today) as { n: number }).n
+    const popularClass = db.prepare(`
+      SELECT c.title, COUNT(b.id) as cnt FROM classes c
+      LEFT JOIN bookings b ON b.class_id = c.id GROUP BY c.id ORDER BY cnt DESC LIMIT 1
+    `).get() as { title: string; cnt: number } | undefined
+    const occupancy = db.prepare(`
+      SELECT ROUND(100.0 * COUNT(b.id) / NULLIF(SUM(c.total_spots), 0), 1) as rate
+      FROM classes c LEFT JOIN bookings b ON b.class_id = c.id
+    `).get() as { rate: number | null }
+
+    res.json({
+      totalBookings, totalRevenue, totalClasses, upcomingClasses,
+      mostPopularClass: popularClass?.title ?? null,
+      popularClassBookings: popularClass?.cnt ?? 0,
+      occupancyRate: occupancy.rate ?? 0,
+    })
+  })
+
+  app.get('/api/users/me', requireAuth, (req: Request, res: Response) => {
+    const user = db.prepare(
+      'SELECT id, name, email, is_admin, created_at FROM users WHERE id = ?'
+    ).get(req.user!.userId) as Omit<UserRow, 'password_hash'> | undefined
+    if (!user) { res.status(404).json({ error: 'User not found' }); return }
+    res.json({ id: user.id, name: user.name, email: user.email, isAdmin: user.is_admin === 1, createdAt: user.created_at })
+  })
+
+  app.put('/api/users/me', requireAuth, async (req: Request, res: Response) => {
+    const { name, email, currentPassword, newPassword } = req.body as {
+      name?: string; email?: string; currentPassword?: string; newPassword?: string
+    }
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user!.userId) as UserRow | undefined
+    if (!user) { res.status(404).json({ error: 'User not found' }); return }
+
+    if (newPassword) {
+      if (!currentPassword || !(await bcrypt.compare(currentPassword, user.password_hash))) {
+        res.status(401).json({ error: 'Current password is incorrect' }); return
+      }
+    }
+    if (email && email !== user.email) {
+      const taken = db.prepare('SELECT id FROM users WHERE email = ? AND id != ?').get(email, user.id)
+      if (taken) { res.status(409).json({ error: 'Email already in use' }); return }
+    }
+
+    const sets: string[] = []
+    const vals: unknown[] = []
+    if (name) { sets.push('name = ?'); vals.push(name) }
+    if (email) { sets.push('email = ?'); vals.push(email) }
+    if (newPassword) { sets.push('password_hash = ?'); vals.push(await bcrypt.hash(newPassword, 10)) }
+
+    if (sets.length) db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...vals, user.id)
     res.json({ ok: true })
   })
 

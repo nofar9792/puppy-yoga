@@ -1185,4 +1185,214 @@ body {
   }
   .admin-tabs::-webkit-scrollbar { display: none; }
   .admin-tab { flex-shrink: 0; }
+
+  /* Stats grid — 2 columns on mobile */
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .stat-card-wide { grid-column: span 2; }
+
+  /* Share button */
+  .share-btn { font-size: 1rem; top: 0.6rem; right: 0.6rem; }
+}
+
+/* ─── Share button ─────────────────────────────────────────────────────────── */
+.card-header {
+  position: relative;
+}
+
+.share-btn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: rgba(255,255,255,0.85);
+  border: none;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  backdrop-filter: blur(4px);
+}
+
+.card:hover .share-btn { opacity: 1; }
+
+.share-copied {
+  position: absolute;
+  top: 0.5rem;
+  right: 3rem;
+  background: #333;
+  color: white;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+/* ─── Past class styling ───────────────────────────────────────────────────── */
+.card-past {
+  opacity: 0.65;
+  filter: grayscale(0.3);
+}
+
+.btn-past {
+  background: #e8e8e8;
+  color: #999;
+  border: 2px solid #ddd;
+  padding: 0.5rem 1.1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* ─── Calendar button in bookings ──────────────────────────────────────────── */
+.btn-cal {
+  background: #fdf0e6;
+  border: 1.5px solid #f0d9c8;
+  color: #c2693a;
+  border-radius: 8px;
+  padding: 0.35rem 0.6rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-cal:hover { background: #f5e0cc; }
+
+/* ─── Booking confirmation modal ───────────────────────────────────────────── */
+.confirmation-body {
+  padding: 1.5rem 1.2rem 0.5rem;
+  text-align: center;
+}
+
+.confirmation-emoji {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.confirmation-title {
+  font-size: 1.2rem;
+  color: #333;
+  margin-bottom: 1rem;
+}
+
+.confirmation-details {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-align: left;
+  background: #fdf6f0;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid #f0e0d0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+/* ─── Admin dashboard stats ────────────────────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.stat-card {
+  background: white;
+  border: 1px solid #f0e0d0;
+  border-radius: 14px;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.stat-card-wide { grid-column: span 2; }
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #c2693a;
+  line-height: 1.1;
+}
+
+.stat-label {
+  font-size: 0.82rem;
+  color: #888;
+  margin-top: 0.4rem;
+}
+
+/* ─── User profile page ─────────────────────────────────────────────────────── */
+.profile-wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+  background: linear-gradient(135deg, #c2693a, #e8956b);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 auto 0.75rem;
+}
+
+.profile-since {
+  text-align: center;
+  color: #888;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.admin-badge-inline {
+  display: block;
+  text-align: center;
+  background: #fff3e0;
+  color: #c2693a;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  margin: 0 auto 1.5rem;
+  width: fit-content;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.profile-section-title {
+  font-size: 1rem;
+  color: #555;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f0e0d0;
+}
+
+.profile-footer {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 0.5rem;
+}
+
+.toast-error {
+  background: #c0392b;
+}
+
+/* ─── Form group small hint text ────────────────────────────────────────────── */
+.form-group small {
+  color: #888;
+  font-size: 0.78rem;
 }

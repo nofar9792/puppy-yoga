@@ -3,16 +3,18 @@ import { useAuth } from './contexts/AuthContext.tsx'
 import Header from './components/Header.tsx'
 import ClassCard from './components/ClassCard.tsx'
 import BookingModal from './components/BookingModal.tsx'
+import BookingConfirmation from './components/BookingConfirmation.tsx'
 import WaitlistModal from './components/WaitlistModal.tsx'
 import MyBookings from './components/MyBookings.tsx'
 import AdminPanel from './components/AdminPanel.tsx'
+import UserProfile from './components/UserProfile.tsx'
 import SearchBar from './components/SearchBar.tsx'
 import AuthModal from './components/AuthModal.tsx'
 import type { YogaClass, Booking, BookingFormData, WaitlistEntry } from './types.ts'
 import './App.css'
 
 type LevelFilter = 'All' | YogaClass['level']
-type View = 'classes' | 'my-bookings' | 'admin'
+type View = 'classes' | 'my-bookings' | 'admin' | 'profile'
 
 const LEVELS: LevelFilter[] = ['All', 'Beginner', 'Intermediate', 'All Levels']
 
@@ -24,12 +26,14 @@ export default function App() {
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedClass, setSelectedClass] = useState<YogaClass | null>(null)
+  const [confirmedBooking, setConfirmedBooking] = useState<{ classItem: YogaClass; formData: BookingFormData } | null>(null)
   const [waitlistClass, setWaitlistClass] = useState<YogaClass | null>(null)
   const [showLoginPrompt, setShowLoginPrompt] = useState(false)
   const [filterLevel, setFilterLevel] = useState<LevelFilter>('All')
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [showPast, setShowPast] = useState(false)
   const [toast, setToast] = useState('')
 
   const fetchClasses = useCallback(async () => {
@@ -54,8 +58,19 @@ export default function App() {
       .finally(() => setLoading(false))
   }, [fetchClasses, fetchBookings, fetchWaitlist])
 
-  // Re-fetch user data when they log in/out
   useEffect(() => { fetchBookings(); fetchWaitlist() }, [user, fetchBookings, fetchWaitlist])
+
+  // Handle ?class=ID deep-link
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const classId = params.get('class')
+    if (!classId) return
+    const found = classes.find(c => c.id === Number(classId))
+    if (found) {
+      window.history.replaceState({}, '', '/')
+      setSelectedClass(found)
+    }
+  }, [classes])
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 4000) }
 
@@ -81,11 +96,15 @@ export default function App() {
     }
     await Promise.all([fetchClasses(), fetchBookings()])
     setSelectedClass(null)
-    showToast(`Booked! See you at "${classItem.title}" 🐾`)
+    setConfirmedBooking({ classItem, formData })
   }
 
   async function handleCancel(classId: number) {
-    await authFetch(`/api/bookings/${classId}`, { method: 'DELETE' })
+    const res = await authFetch(`/api/bookings/${classId}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const body = await res.json() as { error: string }
+      showToast(`Error: ${body.error}`); return
+    }
     await Promise.all([fetchClasses(), fetchBookings()])
     showToast('Booking cancelled.')
   }
@@ -102,7 +121,11 @@ export default function App() {
     showToast(`Added to waitlist for "${classItem.title}" 🐾`)
   }
 
+  const today = new Date().toISOString().split('T')[0]
+
   const filtered = classes.filter(c => {
+    const isPast = c.date < today
+    if (!showPast && isPast) return false
     if (filterLevel !== 'All' && c.level !== filterLevel) return false
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -139,6 +162,8 @@ export default function App() {
           onCancel={handleCancel}
           onBrowse={() => setView('classes')}
         />
+      ) : view === 'profile' && user ? (
+        <UserProfile onBack={() => setView('classes')} />
       ) : (
         <main className="main">
           <section className="hero">
@@ -160,13 +185,19 @@ export default function App() {
                 {level}
               </button>
             ))}
+            <button
+              className={`filter-btn ${showPast ? 'active' : ''}`}
+              onClick={() => setShowPast(v => !v)}
+            >
+              {showPast ? 'Hide Past' : 'Show Past'}
+            </button>
           </div>
 
           {filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-emoji">🔍</div>
               <p>No classes match your search.</p>
-              <button className="btn-book" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setFilterLevel('All') }}>
+              <button className="btn-book" onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setFilterLevel('All'); setShowPast(false) }}>
                 Clear filters
               </button>
             </div>
@@ -178,6 +209,7 @@ export default function App() {
                   classItem={classItem}
                   isBooked={bookings.some(b => b.classId === classItem.id)}
                   onWaitlist={waitlist.some(w => w.classId === classItem.id)}
+                  isPast={classItem.date < today}
                   onBook={() => handleBookClick(classItem)}
                   onJoinWaitlist={() => handleWaitlistClick(classItem)}
                 />
@@ -192,6 +224,13 @@ export default function App() {
           classItem={selectedClass}
           onConfirm={formData => handleBook(selectedClass, formData)}
           onClose={() => setSelectedClass(null)}
+        />
+      )}
+      {confirmedBooking && (
+        <BookingConfirmation
+          classItem={confirmedBooking.classItem}
+          formData={confirmedBooking.formData}
+          onClose={() => setConfirmedBooking(null)}
         />
       )}
       {waitlistClass && (

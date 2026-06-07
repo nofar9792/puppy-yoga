@@ -5,6 +5,7 @@ interface ClassCardProps {
   classItem: YogaClass
   isBooked: boolean
   onWaitlist: boolean
+  isPast?: boolean
   onBook: () => void
   onJoinWaitlist: () => void
 }
@@ -15,8 +16,8 @@ function levelClass(level: YogaClass['level']): string {
   return 'level-all'
 }
 
-export default function ClassCard({ classItem, isBooked, onWaitlist, onBook, onJoinWaitlist }: ClassCardProps) {
-  const { title, instructor, date, time, duration, spots, totalSpots, level, dogs, price, emoji, avgRating, reviewCount } = classItem
+export default function ClassCard({ classItem, isBooked, onWaitlist, isPast, onBook, onJoinWaitlist }: ClassCardProps) {
+  const { id, title, instructor, date, time, duration, spots, totalSpots, level, dogs, price, emoji, avgRating, reviewCount } = classItem
   const isFull = spots === 0
   const spotsPercent = Math.round((spots / totalSpots) * 100)
   const fillColor = spots <= 2 ? '#e74c3c' : spots <= 5 ? '#f39c12' : '#27ae60'
@@ -25,7 +26,20 @@ export default function ClassCard({ classItem, isBooked, onWaitlist, onBook, onJ
     weekday: 'short', month: 'short', day: 'numeric',
   })
 
+  function handleShare() {
+    const url = `${window.location.origin}/?class=${id}`
+    if (navigator.share) {
+      navigator.share({ title, text: `Join me at ${title} 🐾`, url }).catch(() => {})
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+        const el = document.getElementById(`share-toast-${id}`)
+        if (el) { el.style.display = 'block'; setTimeout(() => { el.style.display = 'none' }, 2000) }
+      })
+    }
+  }
+
   function renderAction() {
+    if (isPast) return <div className="btn-past">Past class</div>
     if (isBooked) return <div className="btn-booked">✓ Booked</div>
     if (isFull) {
       return onWaitlist
@@ -36,8 +50,14 @@ export default function ClassCard({ classItem, isBooked, onWaitlist, onBook, onJ
   }
 
   return (
-    <div className="card">
-      <div className="card-header">{emoji}</div>
+    <div className={`card${isPast ? ' card-past' : ''}`}>
+      <div className="card-header">
+        {emoji}
+        <button className="share-btn" onClick={handleShare} title="Share class link" aria-label="Share class">
+          🔗
+        </button>
+        <span id={`share-toast-${id}`} className="share-copied" style={{ display: 'none' }}>Copied!</span>
+      </div>
       <div className="card-body">
         <div className={`level-badge ${levelClass(level)}`}>{level}</div>
         <div className="card-title">{title}</div>
@@ -65,12 +85,14 @@ export default function ClassCard({ classItem, isBooked, onWaitlist, onBook, onJ
           {dogs.map(dog => <span key={dog} className="dog-tag">{dog}</span>)}
         </div>
 
-        <div className="spots-bar">
-          {isFull ? 'Class full' : `${spots} of ${totalSpots} spots left`}
-          <div className="spots-track">
-            <div className="spots-fill" style={{ width: `${spotsPercent}%`, background: fillColor }} />
+        {!isPast && (
+          <div className="spots-bar">
+            {isFull ? 'Class full' : `${spots} of ${totalSpots} spots left`}
+            <div className="spots-track">
+              <div className="spots-fill" style={{ width: `${spotsPercent}%`, background: fillColor }} />
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="card-footer">
           <div className="card-price">${price}<span>/person</span></div>

@@ -47,3 +47,21 @@ export interface Review {
   comment: string
   createdAt: string
 }
+
+export interface AdminStats {
+  totalBookings: number
+  totalRevenue: number
+  totalClasses: number
+  upcomingClasses: number
+  mostPopularClass: string | null
+  popularClassBookings: number
+  occupancyRate: number
+}
+
+export interface UserProfile {
+  id: number
+  name: string
+  email: string
+  isAdmin: boolean
+  createdAt: string
+}

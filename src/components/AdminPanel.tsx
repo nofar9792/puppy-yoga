@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext.tsx'
-import type { YogaClass } from '../types.ts'
+import type { YogaClass, AdminStats } from '../types.ts'
 
-type AdminTab = 'classes' | 'bookings' | 'waitlist'
+type AdminTab = 'classes' | 'bookings' | 'waitlist' | 'dashboard'
 
 interface AdminBooking {
   classId: number; classTitle: string; classDate: string; classTime: string
@@ -14,7 +14,7 @@ interface AdminWaitlist { classId: number; classTitle: string; email: string }
 const EMPTY_FORM = {
   title: '', instructor: '', date: '', time: '', duration: '60 min',
   totalSpots: 10, level: 'All Levels' as YogaClass['level'],
-  dogs: '', price: 35, emoji: '🐕',
+  dogs: '', price: 35, emoji: '🐕', recurrenceWeeks: 1,
 }
 
 export default function AdminPanel() {
@@ -23,6 +23,7 @@ export default function AdminPanel() {
   const [classes, setClasses] = useState<YogaClass[]>([])
   const [bookings, setBookings] = useState<AdminBooking[]>([])
   const [waitlist, setWaitlist] = useState<AdminWaitlist[]>([])
+  const [stats, setStats] = useState<AdminStats | null>(null)
   const [editingClass, setEditingClass] = useState<YogaClass | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -45,9 +46,15 @@ export default function AdminPanel() {
     setWaitlist(await res.json() as AdminWaitlist[])
   }, [authFetch])
 
+  const fetchStats = useCallback(async () => {
+    const res = await authFetch('/api/admin/stats')
+    if (res.ok) setStats(await res.json() as AdminStats)
+  }, [authFetch])
+
   useEffect(() => { fetchClasses() }, [fetchClasses])
   useEffect(() => { if (tab === 'bookings') fetchBookings() }, [tab, fetchBookings])
   useEffect(() => { if (tab === 'waitlist') fetchWaitlist() }, [tab, fetchWaitlist])
+  useEffect(() => { if (tab === 'dashboard') fetchStats() }, [tab, fetchStats])
 
   function openAdd() {
     setEditingClass(null)
@@ -60,13 +67,17 @@ export default function AdminPanel() {
     setForm({
       title: c.title, instructor: c.instructor, date: c.date, time: c.time,
       duration: c.duration, totalSpots: c.totalSpots, level: c.level,
-      dogs: c.dogs.join(', '), price: c.price, emoji: c.emoji,
+      dogs: c.dogs.join(', '), price: c.price, emoji: c.emoji, recurrenceWeeks: 1,
     })
     setShowForm(true)
   }
 
   async function saveClass() {
-    const body = { ...form, dogs: form.dogs.split(',').map(d => d.trim()).filter(Boolean) }
+    const body = {
+      ...form,
+      dogs: form.dogs.split(',').map(d => d.trim()).filter(Boolean),
+      recurrenceWeeks: editingClass ? undefined : form.recurrenceWeeks,
+    }
     if (editingClass) {
       await authFetch(`/api/admin/classes/${editingClass.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -76,7 +87,7 @@ export default function AdminPanel() {
       await authFetch('/api/admin/classes', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       })
-      showMsg('Class added!')
+      showMsg(form.recurrenceWeeks > 1 ? `${form.recurrenceWeeks} weekly classes added!` : 'Class added!')
     }
     setShowForm(false)
     fetchClasses()
@@ -99,7 +110,7 @@ export default function AdminPanel() {
       {toast && <div className="success-banner">{toast}</div>}
 
       <div className="admin-tabs">
-        {(['classes', 'bookings', 'waitlist'] as AdminTab[]).map(t => (
+        {(['classes', 'bookings', 'waitlist', 'dashboard'] as AdminTab[]).map(t => (
           <button key={t} className={`admin-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -177,6 +188,44 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {tab === 'dashboard' && (
+        <div className="admin-section">
+          <h3>Dashboard</h3>
+          {stats ? (
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-value">{stats.totalBookings}</div>
+                <div className="stat-label">Total Bookings</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value">${stats.totalRevenue.toLocaleString()}</div>
+                <div className="stat-label">Total Revenue</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value">{stats.totalClasses}</div>
+                <div className="stat-label">Total Classes</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-value">{stats.upcomingClasses}</div>
+                <div className="stat-label">Upcoming Classes</div>
+              </div>
+              <div className="stat-card stat-card-wide">
+                <div className="stat-value">{stats.occupancyRate}%</div>
+                <div className="stat-label">Overall Occupancy Rate</div>
+              </div>
+              {stats.mostPopularClass && (
+                <div className="stat-card stat-card-wide">
+                  <div className="stat-value">🏆 {stats.mostPopularClass}</div>
+                  <div className="stat-label">Most Popular Class · {stats.popularClassBookings} bookings</div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p>Loading stats…</p>
+          )}
+        </div>
+      )}
+
       {showForm && (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowForm(false) }}>
           <div className="modal modal-wide">
@@ -235,6 +284,18 @@ export default function AdminPanel() {
                 <label>Dogs (comma-separated)</label>
                 <input value={form.dogs} onChange={e => setForm(f => ({ ...f, dogs: e.target.value }))} placeholder="Golden Retriever, Labrador" />
               </div>
+              {!editingClass && (
+                <div className="form-group">
+                  <label>Repeat weekly for (weeks)</label>
+                  <input
+                    type="number" min={1} max={52} value={form.recurrenceWeeks}
+                    onChange={e => setForm(f => ({ ...f, recurrenceWeeks: Number(e.target.value) }))}
+                  />
+                  {form.recurrenceWeeks > 1 && (
+                    <small>Will create {form.recurrenceWeeks} classes, one per week starting from the chosen date.</small>
+                  )}
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn-cancel" onClick={() => setShowForm(false)}>Cancel</button>

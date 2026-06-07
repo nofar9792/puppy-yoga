@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext.tsx'
 import ReviewModal from './ReviewModal.tsx'
 import StarRating from './StarRating.tsx'
+import { downloadICS } from './BookingConfirmation.tsx'
 import type { Booking, YogaClass } from '../types.ts'
 
 interface MyBookingsProps {
@@ -78,6 +79,9 @@ export default function MyBookings({ bookings, classes, onCancel, onBrowse }: My
                 <div className="booking-footer">
                   <span className="booking-date">Booked on {bookedOn}</span>
                   <div className="booking-actions">
+                    <button className="btn-cal" onClick={() => downloadICS(classItem, booking.name)} title="Add to Calendar">
+                      📅
+                    </button>
                     {isPast && (
                       alreadyReviewed
                         ? <span className="reviewed-badge">✓ Reviewed</span>
